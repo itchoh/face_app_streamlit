@@ -6,7 +6,7 @@ from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 
 st.title("🎥 Face Recognition System")
 
-# Load your trained model
+# Load model
 @st.cache_resource
 def load_model():
     try:
@@ -18,11 +18,15 @@ def load_model():
 
 model = load_model()
 
-mp_face = mp.solutions.face_detection
+# ✅ FIXED MediaPipe usage
+mp_face = mp.solutions.face_detection.FaceDetection
 
 class FaceRecTransformer(VideoTransformerBase):
     def __init__(self):
-        self.face_detection = mp_face.FaceDetection(model_selection=0, min_detection_confidence=0.5)
+        self.face_detection = mp_face(
+            model_selection=0,
+            min_detection_confidence=0.5
+        )
 
     def transform(self, frame):
         img = frame.to_ndarray(format="bgr24")
@@ -51,11 +55,14 @@ class FaceRecTransformer(VideoTransformerBase):
                     except:
                         pass
 
-                cv2.rectangle(img, (x, y), (x+width, y+height), (0,255,0), 2)
-                cv2.putText(img, str(name), (x, y-10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
+                cv2.rectangle(img, (x, y), (x+width, y+height), (0, 255, 0), 2)
+                cv2.putText(img, str(name), (x, y - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
         return img
 
 
-webrtc_streamer(key="face-recognition", video_transformer_factory=FaceRecTransformer)
+webrtc_streamer(
+    key="face-recognition",
+    video_transformer_factory=FaceRecTransformer
+)
