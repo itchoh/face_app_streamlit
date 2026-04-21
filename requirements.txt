@@ -3,3 +3,6 @@ opencv-python
 scikit-learn
 joblib
 numpy
+streamlit-webrtc
+opencv-python-headless
+face-recognition
