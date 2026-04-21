@@ -10,7 +10,7 @@ st.title("🎥 Face Recognition System")
 @st.cache_resource
 def load_model():
     try:
-        with open("model/test_save.clf", "rb") as f:
+        with open("test_save.clf", "rb") as f:
             return pickle.load(f)
     except Exception as e:
         st.error(f"Error loading model: {e}")
