@@ -1,4 +1,5 @@
 streamlit
-cv2
-face_recognition
-pickle
+opencv-python
+scikit-learn
+joblib
+numpy
