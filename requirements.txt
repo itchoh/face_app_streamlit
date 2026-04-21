@@ -4,4 +4,4 @@ mediapipe==0.10.33
 scikit-learn
 joblib
 streamlit-webrtc
-numpy
+numpy==1.26.4
