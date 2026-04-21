@@ -1,9 +1,7 @@
 streamlit
 opencv-python-headless
-face-recognition
+mediapipe
 scikit-learn
 joblib
 streamlit-webrtc
 numpy
-cmake
-dlib
