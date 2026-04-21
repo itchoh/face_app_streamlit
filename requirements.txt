@@ -3,5 +3,7 @@ opencv-python-headless
 face-recognition
 scikit-learn
 joblib
-numpy
 streamlit-webrtc
+numpy
+cmake
+dlib
