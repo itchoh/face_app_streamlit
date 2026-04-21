@@ -2,12 +2,13 @@ import streamlit as st
 import cv2
 import pickle
 import numpy as np
+import face_recognition
 
 st.set_page_config(page_title="Face Recognition", layout="centered")
 st.title("🎥 Face Recognition System")
 
 # ---------------------------
-# Load model
+# Load model (KNN on embeddings)
 # ---------------------------
 @st.cache_resource
 def load_model():
@@ -21,69 +22,58 @@ def load_model():
 model = load_model()
 
 # ---------------------------
-# Face detector
+# Camera
 # ---------------------------
-face_cascade = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-)
-
 st.subheader("📸 Capture Image")
 img_file = st.camera_input("Take a photo")
 
 # ---------------------------
-# Process Image (FIXED)
+# Process
 # ---------------------------
 if img_file is not None and model is not None:
 
-    try:
-        file_bytes = np.asarray(bytearray(img_file.getvalue()), dtype=np.uint8)
-        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    file_bytes = np.asarray(bytearray(img_file.getvalue()), dtype=np.uint8)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
-        if img is None:
-            st.error("Could not read image. Try again.")
-            st.stop()
+    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # ---------------------------
+    # FACE DETECTION (face_recognition)
+    # ---------------------------
+    face_locations = face_recognition.face_locations(rgb)
 
-        faces = face_cascade.detectMultiScale(
-            gray,
-            scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(30, 30)
+    if len(face_locations) == 0:
+        st.warning("No face detected")
+        st.image(img, channels="BGR")
+        st.stop()
+
+    # ---------------------------
+    # PREDICTION
+    # ---------------------------
+    for (top, right, bottom, left) in face_locations:
+
+        face_encodings = face_recognition.face_encodings(
+            rgb,
+            [(top, right, bottom, left)]
         )
 
-        if len(faces) == 0:
-            st.warning("No face detected")
-            st.image(img, channels="BGR")
-            st.stop()
+        name = "Unknown"
 
-        for (x, y, w, h) in faces:
+        if len(face_encodings) > 0:
+            encoding = face_encodings[0].reshape(1, -1)
 
-            face_img = img[y:y+h, x:x+w]
-            name = "Unknown"
+            name = model.predict(encoding)[0]
 
-            try:
-                face_resized = cv2.resize(face_img, (128, 128))
-                face_resized = face_resized / 255.0  # normalization
-                face_flat = face_resized.flatten().reshape(1, -1)
+        # draw box
+        cv2.rectangle(img, (left, top), (right, bottom), (0, 255, 0), 2)
+        cv2.putText(
+            img,
+            str(name),
+            (left, top - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (0, 255, 0),
+            2
+        )
 
-                name = model.predict(face_flat)[0]
-
-            except Exception as e:
-                name = "Error"
-
-            cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
-            cv2.putText(
-                img,
-                str(name),
-                (x, y - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 255, 0),
-                2
-            )
-
-        st.image(img, channels="BGR")
-
-    except Exception as e:
-        st.error(f"Processing error: {e}")
+    st.image(img, channels="BGR")
