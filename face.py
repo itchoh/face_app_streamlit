@@ -5,10 +5,10 @@ import numpy as np
 
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, WebRtcMode
 
-# ✅ NEW MediaPipe API
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python import BaseOptions
 
+st.set_page_config(page_title="Face Recognition", layout="centered")
 st.title("🎥 Face Recognition System")
 
 # ---------------------------
@@ -20,7 +20,7 @@ def load_model():
         with open("test_save.clf", "rb") as f:
             return pickle.load(f)
     except Exception as e:
-        st.error(f"Error loading model: {e}")
+        st.error(f"Model loading error: {e}")
         return None
 
 model = load_model()
@@ -37,15 +37,15 @@ def load_face_detector():
         )
         return vision.FaceDetector.create_from_options(options)
     except Exception as e:
-        st.error(f"Error loading face detector: {e}")
+        st.error(f"Face detector error: {e}")
         return None
 
 face_detector = load_face_detector()
 
 # ---------------------------
-# Transformer
+# Video Processor (UPDATED API)
 # ---------------------------
-class FaceRecTransformer(VideoTransformerBase):
+class FaceRecProcessor(VideoTransformerBase):
     def transform(self, frame):
         img = frame.to_ndarray(format="bgr24")
 
@@ -99,19 +99,19 @@ class FaceRecTransformer(VideoTransformerBase):
 
 
 # ---------------------------
-# WebRTC Stream (FIXED)
+# WebRTC Stream (STABLE VERSION)
 # ---------------------------
 webrtc_streamer(
     key="face-recognition",
-    mode="sendrecv",
-    video_transformer_factory=FaceRecTransformer,
+
+    mode=WebRtcMode.SENDRECV,
+
+    video_processor_factory=FaceRecProcessor,
 
     rtc_configuration={
         "iceServers": [
-            {"urls": "stun:stun.l.google.com:19302"},
-            {"urls": "stun:stun1.l.google.com:19302"}
-        ],
-        "iceTransportPolicy": "all"
+            {"urls": ["stun:stun.l.google.com:19302"]}
+        ]
     },
 
     media_stream_constraints={
@@ -119,5 +119,5 @@ webrtc_streamer(
         "audio": False
     },
 
-    async_processing=True
+    async_processing=True,
 )
