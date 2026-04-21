@@ -103,16 +103,21 @@ class FaceRecTransformer(VideoTransformerBase):
 # ---------------------------
 webrtc_streamer(
     key="face-recognition",
-    mode=WebRtcMode.SENDRECV,
+    mode="sendrecv",
     video_transformer_factory=FaceRecTransformer,
+
     rtc_configuration={
         "iceServers": [
-            {"urls": ["stun:stun.l.google.com:19302"]}
-        ]
+            {"urls": "stun:stun.l.google.com:19302"},
+            {"urls": "stun:stun1.l.google.com:19302"}
+        ],
+        "iceTransportPolicy": "all"
     },
+
     media_stream_constraints={
         "video": True,
         "audio": False
     },
-    async_processing=True,
+
+    async_processing=True
 )
