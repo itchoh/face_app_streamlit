@@ -1,12 +1,19 @@
 import streamlit as st
 import cv2
 import pickle
-import mediapipe as mp
+import numpy as np
+
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+
+# ✅ NEW MediaPipe API
+from mediapipe.tasks.python import vision
+from mediapipe.tasks.python import BaseOptions
 
 st.title("🎥 Face Recognition System")
 
+# ---------------------------
 # Load model
+# ---------------------------
 @st.cache_resource
 def load_model():
     try:
@@ -18,16 +25,23 @@ def load_model():
 
 model = load_model()
 
-# ✅ MediaPipe (compatible with mediapipe==0.9.3.0)
-mp_face = mp.solutions.face_detection
+# ---------------------------
+# Load MediaPipe Face Detector
+# ---------------------------
+@st.cache_resource
+def load_face_detector():
+    options = vision.FaceDetectorOptions(
+        base_options=BaseOptions(model_asset_path="face_detector.tflite"),
+        min_detection_confidence=0.5
+    )
+    return vision.FaceDetector.create_from_options(options)
 
+face_detector = load_face_detector()
+
+# ---------------------------
+# Transformer
+# ---------------------------
 class FaceRecTransformer(VideoTransformerBase):
-    def __init__(self):
-        self.face_detection = mp_face.FaceDetection(
-            model_selection=0,
-            min_detection_confidence=0.5
-        )
-
     def transform(self, frame):
         img = frame.to_ndarray(format="bgr24")
 
@@ -35,19 +49,29 @@ class FaceRecTransformer(VideoTransformerBase):
             return img
 
         rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        results = self.face_detection.process(rgb)
 
-        if results and results.detections:
+        # Convert to MediaPipe Image
+        mp_image = vision.Image(
+            image_format=vision.ImageFormat.SRGB,
+            data=rgb
+        )
+
+        results = face_detector.detect(mp_image)
+
+        if results.detections:
+            h, w, _ = img.shape
+
             for detection in results.detections:
-                bbox = detection.location_data.relative_bounding_box
-                h, w, _ = img.shape
+                bbox = detection.bounding_box
 
-                x = max(0, int(bbox.xmin * w))
-                y = max(0, int(bbox.ymin * h))
-                width = int(bbox.width * w)
-                height = int(bbox.height * h)
+                x = int(bbox.origin_x)
+                y = int(bbox.origin_y)
+                width = int(bbox.width)
+                height = int(bbox.height)
 
-                # Prevent out-of-bounds crop
+                # Clamp
+                x = max(0, x)
+                y = max(0, y)
                 x2 = min(w, x + width)
                 y2 = min(h, y + height)
 
@@ -60,7 +84,7 @@ class FaceRecTransformer(VideoTransformerBase):
                         face_resized = cv2.resize(face_img, (128, 128))
                         face_flat = face_resized.flatten().reshape(1, -1)
                         name = model.predict(face_flat)[0]
-                    except Exception:
+                    except:
                         pass
 
                 cv2.rectangle(img, (x, y), (x2, y2), (0, 255, 0), 2)
