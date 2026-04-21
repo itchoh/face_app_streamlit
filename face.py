@@ -21,20 +21,19 @@ def load_model():
 model = load_model()
 
 # ---------------------------
-# OpenCV Face Detector (STABLE)
+# OpenCV Face Detector
 # ---------------------------
 face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
 
 st.subheader("📸 Capture Image")
-
 img_file = st.camera_input("Take a photo")
 
 # ---------------------------
 # Process Image
 # ---------------------------
-if img_file is not None:
+if img_file is not None and model is not None:
 
     file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
     img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
@@ -54,13 +53,21 @@ if img_file is not None:
 
         name = "Unknown"
 
-        if model is not None and face_img.size > 0:
-            try:
-                face_resized = cv2.resize(face_img, (128, 128))
-                face_flat = face_resized.flatten().reshape(1, -1)
-                name = model.predict(face_flat)[0]
-            except:
-                pass
+        try:
+            # ---------------------------
+            # FIXED preprocessing
+            # ---------------------------
+            face_resized = cv2.resize(face_img, (128, 128))
+
+            # normalize (VERY IMPORTANT FIX)
+            face_resized = face_resized / 255.0
+
+            face_flat = face_resized.flatten().reshape(1, -1)
+
+            name = model.predict(face_flat)[0]
+
+        except Exception as e:
+            name = "Error"
 
         cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
         cv2.putText(
