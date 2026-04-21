@@ -3,7 +3,7 @@ import cv2
 import pickle
 import numpy as np
 
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, WebRtcMode
 
 # ✅ NEW MediaPipe API
 from mediapipe.tasks.python import vision
@@ -30,11 +30,15 @@ model = load_model()
 # ---------------------------
 @st.cache_resource
 def load_face_detector():
-    options = vision.FaceDetectorOptions(
-        base_options=BaseOptions(model_asset_path="face_detector.tflite"),
-        min_detection_confidence=0.5
-    )
-    return vision.FaceDetector.create_from_options(options)
+    try:
+        options = vision.FaceDetectorOptions(
+            base_options=BaseOptions(model_asset_path="face_detector.tflite"),
+            min_detection_confidence=0.5
+        )
+        return vision.FaceDetector.create_from_options(options)
+    except Exception as e:
+        st.error(f"Error loading face detector: {e}")
+        return None
 
 face_detector = load_face_detector()
 
@@ -45,12 +49,11 @@ class FaceRecTransformer(VideoTransformerBase):
     def transform(self, frame):
         img = frame.to_ndarray(format="bgr24")
 
-        if img is None:
+        if img is None or face_detector is None:
             return img
 
         rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        # Convert to MediaPipe Image
         mp_image = vision.Image(
             image_format=vision.ImageFormat.SRGB,
             data=rgb
@@ -58,22 +61,16 @@ class FaceRecTransformer(VideoTransformerBase):
 
         results = face_detector.detect(mp_image)
 
-        if results.detections:
+        if results and results.detections:
             h, w, _ = img.shape
 
             for detection in results.detections:
                 bbox = detection.bounding_box
 
-                x = int(bbox.origin_x)
-                y = int(bbox.origin_y)
-                width = int(bbox.width)
-                height = int(bbox.height)
-
-                # Clamp
-                x = max(0, x)
-                y = max(0, y)
-                x2 = min(w, x + width)
-                y2 = min(h, y + height)
+                x = max(0, int(bbox.origin_x))
+                y = max(0, int(bbox.origin_y))
+                x2 = min(w, x + int(bbox.width))
+                y2 = min(h, y + int(bbox.height))
 
                 face_img = img[y:y2, x:x2]
 
@@ -101,7 +98,21 @@ class FaceRecTransformer(VideoTransformerBase):
         return img
 
 
+# ---------------------------
+# WebRTC Stream (FIXED)
+# ---------------------------
 webrtc_streamer(
     key="face-recognition",
-    video_transformer_factory=FaceRecTransformer
+    mode=WebRtcMode.SENDRECV,
+    video_transformer_factory=FaceRecTransformer,
+    rtc_configuration={
+        "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]}
+        ]
+    },
+    media_stream_constraints={
+        "video": True,
+        "audio": False
+    },
+    async_processing=True,
 )
